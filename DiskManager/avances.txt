@@ -1,0 +1,148 @@
+================================================================================
+                    MiniDBMS - REPORTE DE AVANCES DEL MÓDULO
+================================================================================
+
+Este documento detalla el estado actual del desarrollo del componente Disk Manager
+(Storage Engine) y los índices de la base de datos MiniDBMS.
+
+--------------------------------------------------------------------------------
+1. RESUMEN DE COMPONENTES DESARROLLADOS Y SU ESTADO
+--------------------------------------------------------------------------------
+
+El sistema cuenta con una arquitectura por niveles donde cada clase se encarga
+de una parte específica del ciclo de vida del almacenamiento:
+
+*   Simulación de Almacenamiento Físico (PhysicalDisk):
+    - Archivos: include/physical_disk.h, src/physical_disk.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Simula la geometría física de un disco duro (platos/superficies,
+      pistas y sectores) para propósitos educativos, calculando cómo el tamaño
+      de página del DBMS se relaciona con los sectores físicos del disco.
+
+*   Manejador de Disco (DiskManager):
+    - Archivos: include/disk_manager.h, src/disk_manager.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Responsable de la creación y apertura de archivos físicos de base
+      de datos (.db). Realiza lectura y escritura de páginas crudas (raw data)
+      de 4096 bytes mediante offsets de archivo directos (Page_ID * PAGE_SIZE).
+      Gestiona la asignación (AllocatePage) y liberación (DeallocatePage)
+      de páginas a nivel de archivo.
+
+*   Página Ranurada (Page / Slotted Page):
+    - Archivos: include/page.h, include/page_header.h, src/page.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Implementa la estructura de Slotted Page dentro del bloque de 4096
+      bytes. Administra un encabezado (PageHeader), un directorio de ranuras
+      (Slot Array) que crece al principio de la página, y la sección de datos
+      donde los registros se escriben contiguamente desde el final de la página
+      hacia atrás.
+
+*   Serialización de Registros (Record):
+    - Archivos: include/record.h, src/record.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Permite definir y empaquetar tuplas con tipos de datos estructurados
+      (INTEGER y STRING de longitud variable) a una secuencia compacta de bytes
+      para su almacenamiento, soportando también la deserialización posterior.
+
+*   Mapeo de Tabla (HeapFile):
+    - Archivos: include/heap_file.h, src/heap_file.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Agrupa las páginas físicas de una tabla específica. Utiliza el
+      DiskManager para buscar espacio disponible en las páginas existentes o
+      solicitar nuevas páginas cuando es necesario. Identifica cada registro
+      mediante un RID exclusivo (Page ID, Slot ID).
+
+*   Catálogo del Sistema (Catalog):
+    - Archivos: include/catalog.h, src/catalog.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Mantiene la estructura de esquemas de la base de datos (tablas,
+      nombres de columnas, tipos de datos) y el puntero al Page ID inicial
+      de cada tabla (HeapFile). Se almacena de forma persistente en la Página 0.
+
+*   Cargador Dinámico de CSV (CsvLoader):
+    - Archivos: include/csv_loader.h, src/csv_loader.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Realiza la inferencia automática del tipo de datos (INTEGER o STRING)
+      de un CSV leyendo su primera línea, crea la tabla correspondiente en el
+      catálogo y carga recursivamente las filas convirtiéndolas en objetos
+      Record y almacenándolas en el HeapFile de la tabla.
+
+*   Índice Hash Estático (StaticHashIndex):
+    - Archivos: include/hash_index.h, src/hash_index.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Estructura de indexación estática basada en buckets (cubetas). Ante
+      colisiones por exceso de registros en un bucket principal, utiliza el
+      encadenamiento por desbordamiento (overflow chaining), enlazando nuevas
+      páginas de desbordamiento a través del campo `next_page_id` en el header.
+      Permite insertar y buscar rápidamente registros con claves enteras.
+
+*   Herramienta de Inspección Binaria (dump_db):
+    - Archivos: tools/dump_db.cpp
+    - Estado: COMPLETO y funcional.
+    - Rol: Ejecutable independiente que realiza un volcado analítico de un
+      archivo .db página por página. Muestra los metadatos del encabezado, el
+      directorio de slots (activos/borrados), y el contenido de los registros.
+
+--------------------------------------------------------------------------------
+2. OPERACIONES DE INSERCIÓN, ELIMINACIÓN Y ACTUALIZACIÓN DE REGISTROS
+--------------------------------------------------------------------------------
+
+Las operaciones de manipulación de registros (CRUD) a nivel lógico están
+completamente implementadas y distribuidas en la arquitectura del almacenamiento:
+
+- Inserción:
+  * En Page: Busca slots libres (reutilizando tombstones de registros borrados)
+    y copia los bytes serializados en la sección inferior de espacio libre,
+    recalculando `free_space_pointer`.
+  * En HeapFile: Recorre las páginas que posee la tabla para encontrar una con
+    suficiente espacio. Si ninguna tiene espacio, interactúa con el DiskManager
+    para pedir una nueva página mediante `AllocatePage` e inserta en ella.
+- Consulta/Lectura:
+  * Mediante RID(Page ID, Slot ID), se lee la página correspondiente del disco,
+    se consulta el directorio de slots en la posición `Slot ID` y, si la entrada
+    es activa, se extrae el registro y se deserializa.
+- Eliminación:
+  * En Page: Desactiva el registro marcando el slot con offset/length en -1
+    (tombstone) y devuelve el tamaño ocupado por el registro al espacio libre.
+  * En HeapFile: Lee la página indicada por el RID de disco, invoca la
+    eliminación en la página y la escribe de vuelta.
+- Actualización:
+  * En Page: Si el nuevo tamaño es menor o igual al actual, se sobrescribe en
+    el mismo offset. Si es mayor, se marca el slot antiguo como eliminado, se
+    libera el espacio y se reinserta el registro en el espacio libre al final,
+    actualizando la dirección del slot original.
+  * En HeapFile: Coordina la lectura, actualización de bytes en página y escritura
+    a disco físico del bloque modificado.
+
+--------------------------------------------------------------------------------
+3. ANÁLISIS DE RESPONSABILIDAD (¿DÓNDE PERTENECEN ESTAS OPERACIONES?)
+--------------------------------------------------------------------------------
+
+Ante la duda de si estas operaciones son responsabilidad del Disk Manager o del
+Buffer Manager:
+
+1. ¿Es parte del Disk Manager?
+   NO. El Disk Manager sólo se encarga del nivel físico: lee páginas crudas,
+   escribe páginas crudas y asigna o libera páginas completas del archivo de base
+   de datos. No conoce la estructura binaria interna de las páginas, no sabe qué
+   es un slot ni qué campos componen un registro.
+
+2. ¿Es parte del Buffer Manager?
+   NO. El Buffer Manager se encarga de la gestión de memoria RAM intermedia:
+   mantiene las páginas más usadas en memoria para evitar accesos al disco,
+   aplica políticas de reemplazo (LRU, FIFO, Clock) y decide cuándo vaciar
+   páginas sucias (dirty) a disco. Al igual que el Disk Manager, el Buffer Manager
+   es agnóstico a la estructura interna de registros y slots.
+
+3. ¿Dónde pertenecen realmente?
+   Pertenecen a la capa de Gestión de Registros / Archivos (HeapFile y Slotted Page).
+   Esta capa se sitúa *por encima* del Buffer Manager. Solicita páginas al Buffer
+   Manager (o directamente al Disk Manager cuando no hay Buffer Manager), lee y
+   escribe registros manipulando la memoria interna de la página física estructurada.
+
+Dado que la manipulación de registros no corresponde al Buffer Manager sino a la
+capa de Slotted Page/HeapFile (la cual interactúa directamente con el Disk Manager
+en este proyecto por la ausencia de un Buffer Pool), y ya está implementada y
+probada con éxito en los archivos `page.cpp` y `heap_file.cpp`, el desarrollo del
+módulo de disco se encuentra completo y validado.
+================================================================================

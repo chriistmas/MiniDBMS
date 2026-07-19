@@ -28,7 +28,8 @@ DiskManagerProject/
 │   ├── record.h              # Registro/Tupla serializable
 │   ├── heap_file.h           # Heap File + RID (Page ID, Slot ID)
 │   ├── catalog.h             # Catálogo de la base de datos
-│   └── csv_loader.h          # Carga de tablas desde CSV
+│   ├── csv_loader.h          # Carga de tablas desde CSV
+│   └── hash_index.h          # Índice Hash Estático con desbordamiento (Nuevo)
 ├── src/                       # Implementaciones (.cpp)
 │   ├── physical_disk.cpp
 │   ├── page.cpp
@@ -36,7 +37,8 @@ DiskManagerProject/
 │   ├── record.cpp
 │   ├── heap_file.cpp
 │   ├── catalog.cpp
-│   └── csv_loader.cpp
+│   ├── csv_loader.cpp
+│   └── hash_index.cpp        # Implementación del índice hash (Nuevo)
 ├── tests/
 │   └── main.cpp               # Programa de prueba end-to-end
 ├── tools/
@@ -61,17 +63,18 @@ DiskManagerProject/
   de cuántas páginas existen.
 - **Page**: implementa una página tipo *Slotted Page* (Page Header + Slot
   Directory + área de datos que crece en sentido inverso). Soporta
-  insertar, leer, actualizar y eliminar registros dentro de la página.
+  insertar, leer, actualizar y eliminar registros de longitud variable dentro de la página.
 - **Record**: registro genérico serializable a bytes (soporta campos
   `INTEGER` y `STRING` de tamaño variable).
 - **HeapFile**: colección de páginas de una tabla; inserta registros
   buscando espacio disponible o solicitando páginas nuevas al
-  DiskManager; identifica cada registro con un `RID(Page ID, Slot ID)`.
+  DiskManager; identifica cada registro con un `RID(Page ID, Slot ID)`. Soporta inserción, consulta, actualización y eliminación lógica de registros a nivel de archivo.
 - **Catalog**: guarda el nombre de la base de datos, las tablas, sus
   columnas/tipos y en qué página inicia cada `HeapFile`.
 - **CsvLoader**: implementa el flujo `CSV -> Parser -> Esquema -> Páginas
   físicas -> Registros`, infiriendo el tipo de cada columna a partir de
   la primera fila de datos.
+- **StaticHashIndex**: implementa un índice Hash Estático utilizando un número fijo de cubetas (buckets) representadas por páginas físicas. Soporta colisiones mediante encadenamiento de desbordamiento (overflow chaining) usando nuevas páginas asignadas del DiskManager y enlazadas a través del encabezado de página (`next_page_id`). Indexa pares clave-RID y soporta consultas rápidas.
 
 ## Cómo compilar y ejecutar (Ubuntu / VSCode)
 
@@ -103,7 +106,7 @@ g++ -std=c++17 -Iinclude \
 ./disk_manager_test
 ```
 
-> En VSCode: abre la carpeta `DiskManagerProject`, instala la extensión
+> En VSCode: abre la carpeta `DiskManager`, instala la extensión
 > **C/C++** (ms-vscode.cpptools), y usa la terminal integrada (`Ctrl+ñ` o
 > `Ctrl+backtick`) para correr `make run`. También puedes usar la
 > extensión **CMake Tools** si prefieres el flujo con CMake.
@@ -119,7 +122,8 @@ g++ -std=c++17 -Iinclude \
 3. **Prueba manual de página**: inserta, lee, actualiza y elimina
    registros directamente sobre una página (demuestra el uso de
    `Slot Array` + `RID`).
-4. **Prueba de persistencia**: cierra el archivo `.db`, lo vuelve a abrir
+4. **Prueba de Índice Hash Estático**: Crea un índice hash para la primera columna de la tabla cargada, realiza inserciones del índice y busca una clave específica recuperando su registro correspondiente mediante RID.
+5. **Prueba de persistencia**: cierra el archivo `.db`, lo vuelve a abrir
    con una nueva instancia de `DiskManager`, e imprime el contenido 
    guardado validando que el almacenamiento en disco realmente funciona.
 
@@ -151,8 +155,13 @@ finalmente todos los registros deserializados, indicando el tipo de cada campo
   (ver `DiskManager::CalculateOffset`).
 - El RID `(Page ID, Slot ID)` apunta al *slot*, no a la dirección física
   del registro, por lo que un registro puede reubicarse dentro de la
-  página sin invalidar referencias externas.
+  página sin invalidar referencias externas (indirección de slots).
+- **Responsabilidad sobre Inserción, Eliminación y Actualización**:
+  Estas operaciones ocurren a nivel de **Página (Slotted Page)** y **HeapFile** (Record Manager), ya que requieren entender el formato binario interno y la distribución de slots de las páginas.
+  - **Disk Manager** no realiza estas operaciones porque solo maneja lectura/escritura física de páginas crudas y asignación/liberación de espacio a nivel de bloques.
+  - **Buffer Manager** tampoco realiza estas operaciones porque su único fin es gestionar el cache en memoria RAM y las políticas de reemplazo de páginas (LRU, Clock, etc.).
 - Este módulo queda explícitamente por **debajo** del Buffer Manager:
   cada llamada a `ReadPage`/`WritePage` va directo a disco (no hay caché
   en memoria), tal como corresponde al límite de responsabilidad del
   Disk Manager.
+
