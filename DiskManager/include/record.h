@@ -8,15 +8,15 @@
  * Record
  * -------------------------------------------------------------------------
  * Representa un registro/tupla generico como una lista de campos tipados.
- * Sabe serializarse a bytes (para guardarse dentro de una pagina) y
- * reconstruirse a partir de esos bytes.
  *
- * Formato de serializacion:
+ * Formato de serializacion (Slotted Record Format):
  *   [int field_count]
- *   por cada campo:
- *      [char tag]   'I' = INTEGER, 'S' = STRING
- *      si 'I': [int value]
- *      si 'S': [int length][bytes...]
+ *   [Null Bitmap] -> ceil(field_count / 8.0) bytes
+ *   [Directorio de longitud fija] -> Por cada campo (9 bytes):
+ *       [char tag] 'I' = INTEGER, 'S' = STRING
+ *       [int offset_or_val] Si 'I' es el valor, si 'S' es el offset al dato variable
+ *       [int length] Si 'S' es la longitud del string, si 'I' es 0.
+ *   [Datos de longitud variable] -> Los strings concatenados
  * -------------------------------------------------------------------------
  */
 class Record {
@@ -25,6 +25,7 @@ public:
 
     void AddInt(int value);
     void AddString(const std::string& value);
+    void AddNull(); // Agrega un campo nulo (sin tipo especifico para simplificar)
 
     // Serializa el registro en out_buffer (debe tener espacio suficiente).
     // Devuelve el tamano en bytes ocupado.
@@ -37,16 +38,18 @@ public:
     static Record Deserialize(const char* buffer, int size);
 
     int FieldCount() const;
+    bool IsNull(int index) const;
     int GetInt(int index) const;
     std::string GetString(int index) const;
 
     std::string ToString() const;
 
 private:
-    enum class FieldType { INT, STRING };
+    enum class FieldType { INT, STRING, NULL_TYPE };
 
     struct Field {
         FieldType type;
+        bool is_null = false;
         int int_value = 0;
         std::string str_value;
     };

@@ -11,6 +11,7 @@
  */
 struct PageHeader {
     int page_id;             // identificador de la pagina
+    int next_page_id;        // identificador de la siguiente pagina (para overflow chaining)
     int record_count;        // cantidad de registros activos (no eliminados)
     int slot_count;          // cantidad total de slots (incluye eliminados)
     int free_space;          // bytes libres disponibles en la pagina

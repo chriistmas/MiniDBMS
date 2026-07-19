@@ -13,6 +13,7 @@ void Page::InitEmptyPage(int page_id) {
     std::memset(data_, 0, PAGE_SIZE);
     PageHeader* h = Header();
     h->page_id = page_id;
+    h->next_page_id = -1;
     h->record_count = 0;
     h->slot_count = 0;
     h->free_space_pointer = PAGE_SIZE;
@@ -24,6 +25,9 @@ const char* Page::GetData() const { return data_; }
 
 int Page::GetPageId() const { return Header()->page_id; }
 void Page::SetPageId(int page_id) { Header()->page_id = page_id; }
+
+int Page::GetNextPageId() const { return Header()->next_page_id; }
+void Page::SetNextPageId(int next_page_id) { Header()->next_page_id = next_page_id; }
 
 int Page::GetRecordCount() const { return Header()->record_count; }
 int Page::GetSlotCount() const { return Header()->slot_count; }

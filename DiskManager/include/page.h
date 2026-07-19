@@ -51,6 +51,9 @@ public:
     int GetPageId() const;
     void SetPageId(int page_id);
 
+    int GetNextPageId() const;
+    void SetNextPageId(int next_page_id);
+
     // Inserta un registro serializado. Devuelve el slot_id o -1 si no cabe.
     int InsertRecord(const char* record_data, int record_size);
 

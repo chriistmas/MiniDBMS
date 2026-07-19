@@ -39,9 +39,12 @@ DiskManagerProject/
 │   └── csv_loader.cpp
 ├── tests/
 │   └── main.cpp               # Programa de prueba end-to-end
+├── tools/
+│   └── dump_db.cpp            # Herramienta para inspeccionar archivos .db
 ├── data/
-│   └── alumnos.csv            # CSV de ejemplo para la carga inicial
-├── Makefile                   # Compilación rápida con g++
+│   ├── alumnos.csv            # CSV de ejemplo para la carga inicial
+│   └── titanic.csv            # Otro CSV de ejemplo
+├── Makefile                   # Compilación principal (all, run, dump, clean)
 ├── CMakeLists.txt             # Alternativa con CMake (opcional)
 └── README.md
 ```
@@ -75,9 +78,10 @@ DiskManagerProject/
 ### Opción 1: Makefile (recomendado, más simple)
 
 ```bash
-cd DiskManagerProject
-make        # compila con g++ -std=c++17
-make run    # compila (si hace falta) y ejecuta la prueba
+make        # compila el programa principal (disk_manager_test)
+make run    # compila (si hace falta) y ejecuta la prueba principal
+make dump   # compila la herramienta de inspección (dump_db)
+make clean  # elimina los binarios y archivos .db generados
 ```
 
 ### Opción 2: CMake
@@ -109,22 +113,36 @@ g++ -std=c++17 -Iinclude \
 1. **Crea el disco**: simula la geometría física (superficies/pistas/
    sectores) y crea el archivo `universidad.db`, reservando la Página 0
    para el catálogo.
-2. **Carga un CSV**: lee `data/alumnos.csv`, infiere el esquema, crea la
-   tabla `alumnos` como Heap File e inserta cada fila.
+2. **Carga interactiva de CSVs**: Muestra un menú listando los archivos
+   en `data/`. Puedes cargar múltiples CSVs de forma interactiva (se 
+   inferirá el esquema automáticamente) o escribir una ruta personalizada.
 3. **Prueba manual de página**: inserta, lee, actualiza y elimina
    registros directamente sobre una página (demuestra el uso de
    `Slot Array` + `RID`).
 4. **Prueba de persistencia**: cierra el archivo `.db`, lo vuelve a abrir
-   con una nueva instancia de `DiskManager`, y confirma que los datos
-   siguen ahí — validando que el almacenamiento en disco realmente
-   funciona.
+   con una nueva instancia de `DiskManager`, e imprime el contenido 
+   guardado validando que el almacenamiento en disco realmente funciona.
 
 Al ejecutarlo verás en consola la geometría simulada del disco, el
-catálogo, los registros insertados y el resultado de la prueba de
-persistencia. El archivo `universidad.db` queda en el directorio de
-ejecución y puede inspeccionarse con `ls -la` o un editor hexadecimal
-(por ejemplo `xxd universidad.db | less`) para comprobar que su tamaño es
-múltiplo exacto de `PAGE_SIZE` (4096 bytes).
+catálogo, los registros insertados y el resultado de la prueba de persistencia.
+
+## Cómo inspeccionar los datos (dump_db)
+
+Dado que los archivos `.db` generados usan el formato binario interno de nuestro
+propio Disk Manager (y no son legibles por SQLite o un editor de texto normal),
+hemos creado una herramienta de inspección llamada `dump_db`.
+
+Para usarla:
+
+```bash
+make dump
+./dump_db universidad.db
+```
+
+Esto leerá el archivo página por página y te mostrará un volcado legible:
+el encabezado de la página (espacio libre, slots), el directorio de slots y
+finalmente todos los registros deserializados, indicando el tipo de cada campo
+(INTEGER o STRING) y su valor.
 
 ## Notas de diseño
 

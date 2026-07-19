@@ -1,0 +1,25 @@
+Registros de Longitud Variable
+
+Los registros de longitud variable son esenciales para manejar campos como cadenas de caracteres (varchar), arreglos, multiconjuntos o la presencia de múltiples tipos de registros en un mismo archivo. Para su implementación, se deben resolver dos problemas principales: cómo representar un registro individual para extraer atributos de longitud variable y cómo almacenar estos registros dentro de un bloque de disco .
+
+La representación de un registro de longitud variable típicamente consta de una parte inicial de longitud fija y, posteriormente, el contenido de los atributos de longitud variable. Los atributos de longitud variable se gestionan mediante pares (offset, length) que indican su posición y tamaño. Se menciona el uso de un mapa de bits nulo para optimizar el almacenamiento de atributos nulos .
+
+Para el almacenamiento de estos registros en bloques, se utiliza comúnmente la estructura de página ranurada (slotted-page structure). Esta estructura incluye una cabecera en cada bloque con información sobre el número de entradas, el fin del espacio libre y un array con la ubicación y tamaño de cada registro. Los registros se almacenan contiguamente desde el final del bloque. Las operaciones de inserción y eliminación implican la gestión del espacio libre y el movimiento de registros para evitar la fragmentación. Un aspecto crucial es que los punteros a los registros deben ser indirectos, apuntando a las entradas en la cabecera, lo que permite la reubicación de registros dentro del bloque sin invalidar los punteros externos .
+
+Organización de Registros en Archivos
+
+El documento explora varias formas de organizar registros en archivos, excluyendo la organización de archivos por agrupamiento multitabla:
+
+•
+Organización de archivos tipo Heap: Los registros se pueden colocar en cualquier lugar del archivo donde haya espacio. No hay un orden específico. Se utiliza un mapa de espacio libre para localizar bloques con espacio disponible de manera eficiente .
+
+•
+Organización de archivos secuencial: Los registros se almacenan en orden secuencial según el valor de una
+clave de búsqueda. Aunque soporta acceso ordenado, la eficiencia puede disminuir con muchas operaciones de inserción, eliminación y actualización .
+
+•
+Organización de archivos B+-tree: Relacionada con las estructuras de índice B+-tree, esta organización proporciona acceso ordenado eficiente y acceso muy eficiente a registros específicos, incluso con un gran número de operaciones de inserción, eliminación o actualización .
+
+•
+Organización de archivos Hashing: Se calcula una función hash sobre un atributo de cada registro para determinar en qué bloque del archivo debe colocarse el registro. Está estrechamente relacionada con las estructuras de indexación .
+
