@@ -113,3 +113,52 @@ void HeapFile::ScanAll() const {
 
 int HeapFile::GetFirstPageId() const { return first_page_id_; }
 const std::vector<int>& HeapFile::GetPageIds() const { return page_ids_; }
+
+// ---------------------------------------------------------------------
+// HeapFile::Iterator
+// ---------------------------------------------------------------------
+
+HeapFile::Iterator::Iterator(IPageStore& page_store, const std::vector<int>& page_ids)
+    : page_store_(page_store), page_ids_(page_ids) {}
+
+void HeapFile::Iterator::Open() {
+    page_index_ = 0;
+    slot_index_ = 0;
+}
+
+bool HeapFile::Iterator::Next(RID& out_rid, Record& out_record) {
+    while (page_index_ < page_ids_.size()) {
+        int page_id = page_ids_[page_index_];
+
+        char page_data[PAGE_SIZE];
+        page_store_.ReadPage(page_id, page_data);
+
+        Page page(page_id);
+        std::memcpy(page.GetData(), page_data, PAGE_SIZE);
+
+        int slot_count = page.GetSlotCount();
+        while (slot_index_ < slot_count) {
+            int slot = slot_index_++;
+            char record_buffer[PAGE_SIZE];
+            int record_size = 0;
+            if (page.GetRecord(slot, record_buffer, record_size)) {
+                out_rid = RID{page_id, slot};
+                out_record = Record::Deserialize(record_buffer, record_size);
+                return true;
+            }
+            // slot eliminado (tombstone): seguir buscando
+        }
+
+        // Se agoto esta pagina, pasar a la siguiente
+        page_index_++;
+        slot_index_ = 0;
+    }
+    return false;
+}
+
+void HeapFile::Iterator::Close() {
+    // No hay recursos que liberar (page_store_ es externo); se deja el
+    // metodo por simetria con el resto de operadores del motor (Open/
+    // Next/Close), y como punto de extension futuro (p.ej. liberar pines
+    // si en el futuro el iterador mantuviera una pagina fetch-eada).
+}

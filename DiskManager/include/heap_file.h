@@ -47,6 +47,36 @@ public:
     int GetFirstPageId() const;
     const std::vector<int>& GetPageIds() const;
 
+    /*
+     * Iterator
+     * ---------------------------------------------------------------
+     * Cursor que recorre los registros ACTIVOS del HeapFile de a uno,
+     * en el orden fisico (pagina por pagina, slot por slot). Es la base
+     * del operador fisico SeqScan del motor de consultas (modelo
+     * Volcano: Open/Next/Close), para no forzar a que todo el archivo
+     * se materialice en memoria antes de procesarlo.
+     * ---------------------------------------------------------------
+     */
+    class Iterator {
+    public:
+        Iterator(IPageStore& page_store, const std::vector<int>& page_ids);
+
+        void Open();
+
+        // Avanza al siguiente registro activo. Devuelve false al agotarse.
+        bool Next(RID& out_rid, Record& out_record);
+
+        void Close();
+
+    private:
+        IPageStore& page_store_;
+        const std::vector<int>& page_ids_;
+        size_t page_index_ = 0;
+        int slot_index_ = 0;
+    };
+
+    Iterator GetIterator() const { return Iterator(page_store_, page_ids_); }
+
 private:
     IPageStore& page_store_;
     int first_page_id_;
