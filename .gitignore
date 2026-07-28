@@ -67,3 +67,11 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Binarios y bases de datos generadas al compilar/ejecutar
+*.db
+disk_manager_test
+buffer_pool_test
+index_test
+query_engine_test
+dump_db
