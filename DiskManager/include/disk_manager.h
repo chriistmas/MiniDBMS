@@ -6,6 +6,7 @@
 #include <vector>
 #include "page.h"
 #include "physical_disk.h"
+#include "i_page_store.h"
 
 /*
  * DiskManager
@@ -28,10 +29,10 @@
  *   - Buffer Pool, Frames, LRU/FIFO/Clock, Dirty Pages, Pin/Unpin, RAM.
  * -------------------------------------------------------------------------
  */
-class DiskManager {
+class DiskManager : public IPageStore {
 public:
     explicit DiskManager(const std::string& db_filename);
-    ~DiskManager();
+    ~DiskManager() override;
 
     // Crea el archivo fisico de la base de datos desde cero (simulando el disco).
     // Reserva automaticamente la Pagina 0 para el catalogo.
@@ -43,18 +44,18 @@ public:
     void CloseDatabase();
 
     // Lee PAGE_SIZE bytes desde el archivo hacia page_data (buffer ya reservado).
-    void ReadPage(int page_id, char* page_data);
+    void ReadPage(int page_id, char* page_data) override;
 
     // Escribe PAGE_SIZE bytes desde page_data hacia el archivo.
-    void WritePage(int page_id, const char* page_data);
+    void WritePage(int page_id, const char* page_data) override;
 
     // Asigna una nueva pagina (reutiliza una libre si existe) y devuelve su Page ID.
-    int AllocatePage();
+    int AllocatePage() override;
 
     // Marca una pagina como libre para ser reutilizada mas adelante.
-    void DeallocatePage(int page_id);
+    void DeallocatePage(int page_id) override;
 
-    int GetNumPages() const;
+    int GetNumPages() const override;
     bool DatabaseExists() const;
     const std::string& GetFilename() const;
 

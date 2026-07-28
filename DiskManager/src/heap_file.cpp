@@ -3,8 +3,8 @@
 #include <iostream>
 #include <cstring>
 
-HeapFile::HeapFile(DiskManager& disk_manager, int first_page_id)
-    : disk_manager_(disk_manager), first_page_id_(first_page_id) {
+HeapFile::HeapFile(IPageStore& page_store, int first_page_id)
+    : page_store_(page_store), first_page_id_(first_page_id) {
     page_ids_.push_back(first_page_id_);
 }
 
@@ -15,26 +15,26 @@ RID HeapFile::InsertRecord(const Record& record) {
     // 1. Intentar insertar en alguna pagina existente que tenga espacio
     for (int page_id : page_ids_) {
         char page_data[PAGE_SIZE];
-        disk_manager_.ReadPage(page_id, page_data);
+        page_store_.ReadPage(page_id, page_data);
 
         Page page(page_id);
         std::memcpy(page.GetData(), page_data, PAGE_SIZE);
 
         int slot_id = page.InsertRecord(buffer, record_size);
         if (slot_id != -1) {
-            disk_manager_.WritePage(page_id, page.GetData());
+            page_store_.WritePage(page_id, page.GetData());
             RID rid{page_id, slot_id};
             return rid;
         }
     }
 
     // 2. Ninguna pagina existente tiene espacio: solicitar una nueva
-    int new_page_id = disk_manager_.AllocatePage();
+    int new_page_id = page_store_.AllocatePage();
     page_ids_.push_back(new_page_id);
 
     Page page(new_page_id);
     int slot_id = page.InsertRecord(buffer, record_size);
-    disk_manager_.WritePage(new_page_id, page.GetData());
+    page_store_.WritePage(new_page_id, page.GetData());
 
     RID rid{new_page_id, slot_id};
     return rid;
@@ -42,7 +42,7 @@ RID HeapFile::InsertRecord(const Record& record) {
 
 bool HeapFile::GetRecord(const RID& rid, Record& out_record) const {
     char page_data[PAGE_SIZE];
-    disk_manager_.ReadPage(rid.page_id, page_data);
+    page_store_.ReadPage(rid.page_id, page_data);
 
     Page page(rid.page_id);
     std::memcpy(page.GetData(), page_data, PAGE_SIZE);
@@ -59,7 +59,7 @@ bool HeapFile::GetRecord(const RID& rid, Record& out_record) const {
 
 bool HeapFile::DeleteRecord(const RID& rid) {
     char page_data[PAGE_SIZE];
-    disk_manager_.ReadPage(rid.page_id, page_data);
+    page_store_.ReadPage(rid.page_id, page_data);
 
     Page page(rid.page_id);
     std::memcpy(page.GetData(), page_data, PAGE_SIZE);
@@ -68,13 +68,13 @@ bool HeapFile::DeleteRecord(const RID& rid) {
         return false;
     }
 
-    disk_manager_.WritePage(rid.page_id, page.GetData());
+    page_store_.WritePage(rid.page_id, page.GetData());
     return true;
 }
 
 bool HeapFile::UpdateRecord(const RID& rid, const Record& record) {
     char page_data[PAGE_SIZE];
-    disk_manager_.ReadPage(rid.page_id, page_data);
+    page_store_.ReadPage(rid.page_id, page_data);
 
     Page page(rid.page_id);
     std::memcpy(page.GetData(), page_data, PAGE_SIZE);
@@ -86,14 +86,14 @@ bool HeapFile::UpdateRecord(const RID& rid, const Record& record) {
         return false;
     }
 
-    disk_manager_.WritePage(rid.page_id, page.GetData());
+    page_store_.WritePage(rid.page_id, page.GetData());
     return true;
 }
 
 void HeapFile::ScanAll() const {
     for (int page_id : page_ids_) {
         char page_data[PAGE_SIZE];
-        disk_manager_.ReadPage(page_id, page_data);
+        page_store_.ReadPage(page_id, page_data);
 
         Page page(page_id);
         std::memcpy(page.GetData(), page_data, PAGE_SIZE);

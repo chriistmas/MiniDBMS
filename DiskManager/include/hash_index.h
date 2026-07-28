@@ -1,7 +1,7 @@
 #ifndef HASH_INDEX_H
 #define HASH_INDEX_H
 
-#include "disk_manager.h"
+#include "i_page_store.h"
 #include "heap_file.h" // for RID
 #include <vector>
 
@@ -21,7 +21,7 @@ class StaticHashIndex {
 public:
     // Crea un nuevo indice o abre uno existente.
     // Si first_page_id es -1, asigna num_buckets paginas consecutivas.
-    StaticHashIndex(DiskManager& disk_manager, int num_buckets, int first_page_id = -1);
+    StaticHashIndex(IPageStore& page_store, int num_buckets, int first_page_id = -1);
 
     int GetFirstPageId() const;
     int GetNumBuckets() const;
@@ -33,7 +33,7 @@ public:
     bool Search(int key, std::vector<RID>& out_rids) const;
 
 private:
-    DiskManager& disk_manager_;
+    IPageStore& page_store_;
     int num_buckets_;
     int first_page_id_;
 

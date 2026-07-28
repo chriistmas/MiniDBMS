@@ -4,13 +4,13 @@
 #include <cstring>
 #include <iostream>
 
-StaticHashIndex::StaticHashIndex(DiskManager& disk_manager, int num_buckets, int first_page_id)
-    : disk_manager_(disk_manager), num_buckets_(num_buckets), first_page_id_(first_page_id) {
+StaticHashIndex::StaticHashIndex(IPageStore& page_store, int num_buckets, int first_page_id)
+    : page_store_(page_store), num_buckets_(num_buckets), first_page_id_(first_page_id) {
     
     if (first_page_id_ == -1) {
         // Reservar paginas contiguas para las cubetas principales
         for (int i = 0; i < num_buckets_; i++) {
-            int pid = disk_manager_.AllocatePage();
+            int pid = page_store_.AllocatePage();
             if (i == 0) first_page_id_ = pid;
         }
     }
@@ -39,7 +39,7 @@ bool StaticHashIndex::Insert(int key, const RID& rid) {
 
     while (true) {
         char page_data[PAGE_SIZE];
-        disk_manager_.ReadPage(current_page_id, page_data);
+        page_store_.ReadPage(current_page_id, page_data);
         
         Page page(current_page_id);
         std::memcpy(page.GetData(), page_data, PAGE_SIZE);
@@ -47,7 +47,7 @@ bool StaticHashIndex::Insert(int key, const RID& rid) {
         int slot = page.InsertRecord(record_buffer, record_size);
         if (slot != -1) {
             // Se inserto exitosamente
-            disk_manager_.WritePage(current_page_id, page.GetData());
+            page_store_.WritePage(current_page_id, page.GetData());
             return true;
         }
 
@@ -55,9 +55,9 @@ bool StaticHashIndex::Insert(int key, const RID& rid) {
         int next_page_id = page.GetNextPageId();
         if (next_page_id == -1) {
             // Crear una nueva pagina de desbordamiento (overflow chaining)
-            next_page_id = disk_manager_.AllocatePage();
+            next_page_id = page_store_.AllocatePage();
             page.SetNextPageId(next_page_id);
-            disk_manager_.WritePage(current_page_id, page.GetData()); // actualizar puntero
+            page_store_.WritePage(current_page_id, page.GetData()); // actualizar puntero
         }
         current_page_id = next_page_id;
     }
@@ -71,7 +71,7 @@ bool StaticHashIndex::Search(int key, std::vector<RID>& out_rids) const {
 
     while (current_page_id != -1) {
         char page_data[PAGE_SIZE];
-        disk_manager_.ReadPage(current_page_id, page_data);
+        page_store_.ReadPage(current_page_id, page_data);
         
         Page page(current_page_id);
         std::memcpy(page.GetData(), page_data, PAGE_SIZE);

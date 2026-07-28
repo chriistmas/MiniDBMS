@@ -2,7 +2,7 @@
 #define HEAP_FILE_H
 
 #include <vector>
-#include "disk_manager.h"
+#include "i_page_store.h"
 #include "record.h"
 
 /*
@@ -24,13 +24,14 @@ struct RID {
  * HeapFile
  * -------------------------------------------------------------------------
  * Coleccion de paginas donde los registros de una tabla se almacenan sin
- * un orden especifico. Usa al DiskManager para leer/escribir las paginas
- * fisicas que le pertenecen.
+ * un orden especifico. Usa un IPageStore (DiskManager directo, o un
+ * BufferPoolManager a traves de su adaptador) para leer/escribir las
+ * paginas fisicas que le pertenecen.
  * -------------------------------------------------------------------------
  */
 class HeapFile {
 public:
-    HeapFile(DiskManager& disk_manager, int first_page_id);
+    HeapFile(IPageStore& page_store, int first_page_id);
 
     // Inserta un registro. Si ninguna pagina existente tiene espacio,
     // se solicita una nueva pagina al DiskManager.
@@ -47,7 +48,7 @@ public:
     const std::vector<int>& GetPageIds() const;
 
 private:
-    DiskManager& disk_manager_;
+    IPageStore& page_store_;
     int first_page_id_;
     std::vector<int> page_ids_; // paginas que pertenecen a esta tabla
 };
