@@ -29,10 +29,10 @@ int BufferPoolManager::FindAvailableFrame() {
 
     Frame& victim = frames_[victim_frame_id];
     if (victim.is_dirty) {
-        disk_manager_.WritePage(victim.page.GetPageId(), victim.page.GetData());
+        disk_manager_.WritePage(victim.page_id, victim.page.GetData());
         victim.is_dirty = false;
     }
-    page_table_.erase(victim.page.GetPageId());
+    page_table_.erase(victim.page_id);
     victim.in_use = false;
     return victim_frame_id;
 }
@@ -60,7 +60,7 @@ Page* BufferPoolManager::FetchPage(int page_id) {
 
     Frame& frame = frames_[frame_id];
     disk_manager_.ReadPage(page_id, frame.page.GetData());
-    frame.page.SetPageId(page_id);
+    frame.page_id = page_id;
     frame.pin_count = 1;
     frame.is_dirty = false;
     frame.in_use = true;
@@ -132,6 +132,7 @@ Page* BufferPoolManager::NewPage(int* page_id_out) {
 
     Frame& frame = frames_[frame_id];
     frame.page = Page(new_page_id); // pagina vacia, inicializada en memoria
+    frame.page_id = new_page_id;
     frame.pin_count = 1;
     frame.is_dirty = true; // aun no existe en disco con este contenido
     frame.in_use = true;

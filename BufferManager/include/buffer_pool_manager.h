@@ -19,6 +19,7 @@
  */
 struct Frame {
     Page page;
+    int page_id = -1;   // identidad de la pagina cacheada (bookkeeping del pool)
     int pin_count = 0;
     bool is_dirty = false;
     bool in_use = false; // true si actualmente contiene una pagina valida
