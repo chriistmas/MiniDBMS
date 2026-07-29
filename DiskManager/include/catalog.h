@@ -22,6 +22,7 @@ struct TableDefinition {
     std::string table_name;
     std::vector<ColumnDefinition> columns;
     int first_page_id = -1; // primera pagina del HeapFile de esta tabla
+    std::vector<int> page_ids; // TODAS las paginas de la tabla (para reabrir correctamente)
 };
 
 class Catalog {

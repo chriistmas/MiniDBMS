@@ -21,6 +21,10 @@ std::string Catalog::Serialize() const {
     oss << "DATABASE " << database_name_ << "\n";
     for (const auto& table : tables_) {
         oss << "TABLE " << table.table_name << " " << table.first_page_id << "\n";
+        oss << "PAGES";
+        for (int pid : table.page_ids) oss << " " << pid;
+        if (table.page_ids.empty()) oss << " " << table.first_page_id;
+        oss << "\n";
         for (const auto& col : table.columns) {
             oss << "COLUMN " << col.name << " " << col.type << "\n";
         }
@@ -50,6 +54,9 @@ Catalog Catalog::Deserialize(const std::string& text) {
             current_table = TableDefinition();
             ls >> current_table.table_name >> current_table.first_page_id;
             in_table = true;
+        } else if (keyword == "PAGES" && in_table) {
+            int pid;
+            while (ls >> pid) current_table.page_ids.push_back(pid);
         } else if (keyword == "COLUMN" && in_table) {
             ColumnDefinition col;
             ls >> col.name >> col.type;

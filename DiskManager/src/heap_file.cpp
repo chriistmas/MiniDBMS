@@ -114,6 +114,21 @@ void HeapFile::ScanAll() const {
 int HeapFile::GetFirstPageId() const { return first_page_id_; }
 const std::vector<int>& HeapFile::GetPageIds() const { return page_ids_; }
 
+void HeapFile::RestorePageIds(const std::vector<int>& page_ids) {
+    if (!page_ids.empty()) {
+        page_ids_ = page_ids;
+    }
+    // Garantizar que la primera pagina siempre este presente, aunque
+    // el catalogo persistido viniera incompleto.
+    bool has_first = false;
+    for (int pid : page_ids_) {
+        if (pid == first_page_id_) { has_first = true; break; }
+    }
+    if (!has_first) {
+        page_ids_.insert(page_ids_.begin(), first_page_id_);
+    }
+}
+
 // ---------------------------------------------------------------------
 // HeapFile::Iterator
 // ---------------------------------------------------------------------

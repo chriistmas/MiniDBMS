@@ -30,7 +30,7 @@ bool CsvLoader::LooksLikeInteger(const std::string& token) {
 
 bool CsvLoader::LoadCsvIntoTable(const std::string& csv_path,
                                   const std::string& table_name,
-                                  DiskManager& disk_manager,
+                                  IPageStore& page_store,
                                   Catalog& catalog,
                                   HeapFile** out_heap_file) {
     std::ifstream file(csv_path);
@@ -65,11 +65,12 @@ bool CsvLoader::LoadCsvIntoTable(const std::string& csv_path,
     }
 
     // 2. Crear el archivo/paginas fisicas para esta tabla (primera pagina)
-    int first_page_id = disk_manager.AllocatePage();
+    int first_page_id = page_store.AllocatePage();
     table.first_page_id = first_page_id;
+    table.page_ids.push_back(first_page_id);
     catalog.AddTable(table);
 
-    HeapFile* heap_file = new HeapFile(disk_manager, first_page_id);
+    HeapFile* heap_file = new HeapFile(page_store, first_page_id);
 
     // 3. Convertir la primera fila (ya leida) y las restantes en registros
     auto insert_row = [&](const std::vector<std::string>& row) {

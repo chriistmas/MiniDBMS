@@ -2,7 +2,7 @@
 #define CSV_LOADER_H
 
 #include <string>
-#include "disk_manager.h"
+#include "i_page_store.h"
 #include "catalog.h"
 #include "heap_file.h"
 
@@ -25,7 +25,7 @@ public:
     // (el llamador es responsable de conservarlo mientras use la tabla).
     static bool LoadCsvIntoTable(const std::string& csv_path,
                                   const std::string& table_name,
-                                  DiskManager& disk_manager,
+                                  IPageStore& page_store,
                                   Catalog& catalog,
                                   HeapFile** out_heap_file);
 

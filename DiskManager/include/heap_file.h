@@ -47,6 +47,12 @@ public:
     int GetFirstPageId() const;
     const std::vector<int>& GetPageIds() const;
 
+    // Restaura la lista completa de paginas de una tabla ya existente
+    // (leida del Catalog persistido). Sin esto, un HeapFile reconstruido
+    // solo con first_page_id "olvidaria" las paginas siguientes y un
+    // Scan devolveria resultados incompletos tras reabrir la base.
+    void RestorePageIds(const std::vector<int>& page_ids);
+
     /*
      * Iterator
      * ---------------------------------------------------------------
